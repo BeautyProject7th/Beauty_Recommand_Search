@@ -160,9 +160,9 @@ class CooccurrenceAlgorithm(val ap: CooccurrenceAlgorithmParams)
       .getOrElse(model.userStringIntMap(query.user), Array()).toMap
     //.map { case (index, indexCounts) => (index, indexCounts.map(_._2).sum) }
 
-    val query_list: Set[String] = query.search match {
-      case Some(s) => s.split(" ").toSet
-      case None => Set()
+    val query_list: Option[Set[String]] = query.search match {
+      case Some(s) => Some(s.split(" ").toSet)
+      case None => None
     }
 
     val counts: Array[(Int, Double)] = {
@@ -173,14 +173,23 @@ class CooccurrenceAlgorithm(val ap: CooccurrenceAlgorithmParams)
               case (i,score) => (i, score+content_counts.getOrElse(i,0.0))
             }
             sum_array.toArray
-          case None => content_counts.toArray
+          case None =>
+            query.result_type match {
+              case Some(r) =>
+                //popluar일때
+                itemZeroScore.toArray
+              case None => content_counts.toArray
+            }
         }
       }
       else if(query.item_type == "cosmetic"){
+        itemZeroScore.toArray
+        /*
         query.search match {
           case Some(s) =>itemZeroScore.toArray
           case None => Array()
         }
+        */
       }else Array()
     }
 
@@ -218,46 +227,56 @@ class CooccurrenceAlgorithm(val ap: CooccurrenceAlgorithmParams)
                        cosmetic: Option[String],
                        whiteList: Option[Set[Int]],
                        blackList: Option[Set[Int]],
-                       queryList: Set[String],
+                       queryList: Option[Set[String]],
                        brand: Option[String],
                        itemIntStringMap: BiMap[Int, String]
                      ): Boolean = {
 
     var query_flag = true
     if(items(i).item_type == "cosmetic") {
-      if(queryList.contains("")) query_flag = false
-      else {
-        queryList.map { s =>
-          if (!itemIntStringMap(i).replaceAll(" ", "").contains(s)) {
-            query_flag = false
-            logger.info(s"cosmetic ${itemIntStringMap(i).replaceAll(" ", "")} not contain ${s}")
-          }
-        }
-      }
-    }else if(items(i).item_type == "content"){
-      //아래 1,2는 겹칠 일이 없음
-      //1.화장품 상세 - 영상 추천인 경우 ( 쿼리의 화장품이 포함된 결과만 리턴 )
-      if(cosmetic != None){
-        query_flag = items(i).cosmetics.get.contains(cosmetic.get)
-        print(s"${itemIntStringMap(i)} result : ${query_flag}")
-      }else {
-        //2.검색한 경우 검색어 필터링
-        val contain_query = items(i).cosmetics.get
-          .map { c =>
-            var flag = true
-            queryList.map { s =>
-              if (!c.replaceAll(" ", "").contains(s)) {
-                flag = false
-                logger.info(s"content's cosmetic ${c.replaceAll(" ", "")} not contain ${s}")
+      queryList match {
+        case Some(set) =>
+          //popluar일때
+          if(set.contains("")) query_flag = false
+          else {
+            set.map { s =>
+              if (!itemIntStringMap(i).replaceAll(" ", "").contains(s)) {
+                query_flag = false
+                logger.info(s"cosmetic ${itemIntStringMap(i).replaceAll(" ", "")} not contain ${s}")
               }
             }
-            flag
-          }.toSet
-        if (contain_query.contains(true)) {
-          query_flag = true
-        } else {
-          query_flag = false
-        }
+          }
+        case None => query_flag = true
+      }
+    }else if(items(i).item_type == "content"){
+      queryList match {
+        case Some(set) =>
+
+          //아래 1,2는 겹칠 일이 없음
+          //1.화장품 상세 - 영상 추천인 경우 ( 쿼리의 화장품이 포함된 결과만 리턴 )
+          if(cosmetic != None){
+            query_flag = items(i).cosmetics.get.contains(cosmetic.get)
+            print(s"${itemIntStringMap(i)} result : ${query_flag}")
+          }else {
+            //2.검색한 경우 검색어 필터링
+            val contain_query = items(i).cosmetics.get
+              .map { c =>
+                var flag = true
+                queryList.map { s =>
+                  if (!c.replaceAll(" ", "").contains(s)) {
+                    flag = false
+                    logger.info(s"content's cosmetic ${c.replaceAll(" ", "")} not contain ${s}")
+                  }
+                }
+                flag
+              }.toSet
+            if (contain_query.contains(true)) {
+              query_flag = true
+            } else {
+              query_flag = false
+            }
+          }
+        case None => query_flag = true
       }
     }
 

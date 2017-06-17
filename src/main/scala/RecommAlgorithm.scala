@@ -456,55 +456,71 @@ class RecommAlgorithm(val ap: RecommAlgorithmParams)
       case None => Set()
     }
 
-    val topScores: Array[(Int, Double)] = if (userFeature.isDefined) {
-      // the user has feature vector
-      logger.info(s"predict knownuser found for user ${query.user}.")
-      predictKnownUser(
-        userFeature = userFeature.get,
-        productModels = productModels,
-        query = query,
-        whiteList = whiteList,
-        blackList = finalBlackList,
-        itemIntStringMap = model.itemIntStringMap,
-        queryList = queryList
-      )
-    } else {
-      // the user doesn't have feature vector.
-      // For example, new user is created after model is trained.
-      logger.info(s"No userFeature found for user ${query.user}.")
+    val topScores: Array[(Int, Double)] = query.result_type match {
+      case Some(r) =>
+        //필터링 혹은 특정 추천
+        //if (r == "popular"){
+          logger.info(s"popluar recommend.")
+          predictDefault(
+            productModels = productModels,
+            query = query,
+            whiteList = whiteList,
+            blackList = finalBlackList,
+            itemIntStringMap = model.itemIntStringMap,
+            queryList = queryList
+          )
+        //}
+      case None => //원래 추천
+        if (userFeature.isDefined) {
+          // the user has feature vector
+          logger.info(s"predict knownuser found for user ${query.user}.")
+          predictKnownUser(
+            userFeature = userFeature.get,
+            productModels = productModels,
+            query = query,
+            whiteList = whiteList,
+            blackList = finalBlackList,
+            itemIntStringMap = model.itemIntStringMap,
+            queryList = queryList
+          )
+        } else {
+          // the user doesn't have feature vector.
+          // For example, new user is created after model is trained.
+          logger.info(s"No userFeature found for user ${query.user}.")
 
-      // check if the user has recent events on some items
-      val recentItems: Set[String] = getRecentItems(query)
-      val recentList: Set[Int] = recentItems.flatMap (x =>
-        model.itemStringIntMap.get(x))
+          // check if the user has recent events on some items
+          val recentItems: Set[String] = getRecentItems(query)
+          val recentList: Set[Int] = recentItems.flatMap (x =>
+            model.itemStringIntMap.get(x))
 
-      val recentFeatures: Vector[Array[Double]] = recentList.toVector
-        // productModels may not contain the requested item
-        .map { i =>
-          productModels.get(i).flatMap { pm => pm.features }
-        }.flatten
+          val recentFeatures: Vector[Array[Double]] = recentList.toVector
+            // productModels may not contain the requested item
+            .map { i =>
+            productModels.get(i).flatMap { pm => pm.features }
+          }.flatten
 
-      if (recentFeatures.isEmpty) {
-        logger.info(s"No features vector for recent items ${recentItems}.")
-        predictDefault(
-          productModels = productModels,
-          query = query,
-          whiteList = whiteList,
-          blackList = finalBlackList,
-          itemIntStringMap = model.itemIntStringMap,
-          queryList = queryList
-        )
-      } else {
-        predictSimilar(
-          recentFeatures = recentFeatures,
-          productModels = productModels,
-          query = query,
-          whiteList = whiteList,
-          blackList = finalBlackList,
-          itemIntStringMap = model.itemIntStringMap,
-          queryList = queryList
-        )
-      }
+          if (recentFeatures.isEmpty) {
+            logger.info(s"No features vector for recent items ${recentItems}.")
+            predictDefault(
+              productModels = productModels,
+              query = query,
+              whiteList = whiteList,
+              blackList = finalBlackList,
+              itemIntStringMap = model.itemIntStringMap,
+              queryList = queryList
+            )
+          } else {
+            predictSimilar(
+              recentFeatures = recentFeatures,
+              productModels = productModels,
+              query = query,
+              whiteList = whiteList,
+              blackList = finalBlackList,
+              itemIntStringMap = model.itemIntStringMap,
+              queryList = queryList
+            )
+          }
+        }
     }
 
 

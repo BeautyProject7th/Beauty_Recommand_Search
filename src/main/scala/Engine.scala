@@ -8,6 +8,7 @@ case class Query(
   num: Int,
   item_type: String,
   search: Option[String],
+  result_type: Option[String],
   cosmetic: Option[String],
   brand: Option[String],
   categories: Option[Set[String]],

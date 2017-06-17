@@ -4,14 +4,14 @@
   "engineFactory": "org.example.recommand_search.RecommerceRecommendationEngine",
   "datasource": {
     "params" : {
-      "appName": "AA"
+      "appName": "Beauty"
     }
   },
   "algorithms": [
     {
       "name": "recomm",
       "params": {
-        "appName": "AA",
+        "appName": "Beauty",
         "unseenOnly": true,
         "seenEvents": ["view","play","own","rate","scrap"],
         "similarEvents": ["view","play","own","rate","scrap"],
