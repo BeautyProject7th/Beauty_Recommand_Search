@@ -13,7 +13,7 @@
       "params": {
         "appName": "Beauty",
         "unseenOnly": true,
-        "seenEvents": ["view","play","own","rate","scrap"],
+        "seenEvents": ["own","scrap"],
         "similarEvents": ["view","play","own","rate","scrap"],
         "rank": 10,
         "numIterations" : 10,
