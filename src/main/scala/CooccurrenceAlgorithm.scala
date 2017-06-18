@@ -262,7 +262,7 @@ class CooccurrenceAlgorithm(val ap: CooccurrenceAlgorithmParams)
             val contain_query = items(i).cosmetics.get
               .map { c =>
                 var flag = true
-                queryList.map { s =>
+                set.map { s =>
                   if (!c.replaceAll(" ", "").contains(s)) {
                     flag = false
                     logger.info(s"content's cosmetic ${c.replaceAll(" ", "")} not contain ${s}")
@@ -276,7 +276,14 @@ class CooccurrenceAlgorithm(val ap: CooccurrenceAlgorithmParams)
               query_flag = false
             }
           }
-        case None => query_flag = true
+        case None =>
+          if(cosmetic != None){
+            query_flag = items(i).cosmetics.get.contains(cosmetic.get)
+            print(s"${itemIntStringMap(i)} result : ${query_flag}")
+          }else {
+            //2.검색한 경우 검색어 필터링
+            query_flag = true
+          }
       }
     }
 
