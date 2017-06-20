@@ -32,43 +32,43 @@ import scala.concurrent.ExecutionContext.Implicits.global
   * seed: MLlib ALS 알고리즘의 random seed. (Optional)
   */
 case class RecommAlgorithmParams(
-  appName: String,
-  unseenOnly: Boolean,
-  seenEvents: List[String],
-  similarEvents: List[String],
-  rank: Int,
-  numIterations: Int,
-  lambda: Double,
-  seed: Option[Long]
-) extends Params
+                                  appName: String,
+                                  unseenOnly: Boolean,
+                                  seenEvents: List[String],
+                                  similarEvents: List[String],
+                                  rank: Int,
+                                  numIterations: Int,
+                                  lambda: Double,
+                                  seed: Option[Long]
+                                ) extends Params
 
 
 case class ProductModel(
-  item: Item,
-  features: Option[Array[Double]], // features by ALS
-  count: Double // popular count for default score
-)
+                         item: Item,
+                         features: Option[Array[Double]], // features by ALS
+                         count: Double // popular count for default score
+                       )
 
 class RecommModel(
-  val rank: Int,
-  val userFeatures: Map[Int, Array[Double]],
-  val productModels: Map[Int, ProductModel],
-  val userStringIntMap: BiMap[String, Int],
-  val itemStringIntMap: BiMap[String, Int]
-) extends Serializable {
+                   val rank: Int,
+                   val userFeatures: Map[Int, Array[Double]],
+                   val productModels: Map[Int, ProductModel],
+                   val userStringIntMap: BiMap[String, Int],
+                   val itemStringIntMap: BiMap[String, Int]
+                 ) extends Serializable {
 
   @transient lazy val itemIntStringMap = itemStringIntMap.inverse
 
   override def toString = {
     s" rank: ${rank}" +
-    s" userFeatures: [${userFeatures.size}]" +
-    s"(${userFeatures.take(2).toList}...)" +
-    s" productModels: [${productModels.size}]" +
-    s"(${productModels.take(2).toList}...)" +
-    s" userStringIntMap: [${userStringIntMap.size}]" +
-    s"(${userStringIntMap.take(2).toString}...)]" +
-    s" itemStringIntMap: [${itemStringIntMap.size}]" +
-    s"(${itemStringIntMap.take(2).toString}...)]"
+      s" userFeatures: [${userFeatures.size}]" +
+      s"(${userFeatures.take(2).toList}...)" +
+      s" productModels: [${productModels.size}]" +
+      s"(${productModels.take(2).toList}...)" +
+      s" userStringIntMap: [${userStringIntMap.size}]" +
+      s"(${userStringIntMap.take(2).toString}...)]" +
+      s" itemStringIntMap: [${itemStringIntMap.size}]" +
+      s"(${itemStringIntMap.take(2).toString}...)]"
   }
 }
 
@@ -94,12 +94,12 @@ class RecommAlgorithm(val ap: RecommAlgorithmParams)
       */
     require(!data.users.take(1).isEmpty,
       s"users in PreparedData cannot be empty." +
-      " Please check if DataSource generates TrainingData" +
-      " and Preprator generates PreparedData correctly.")
+        " Please check if DataSource generates TrainingData" +
+        " and Preprator generates PreparedData correctly.")
     require(!data.items.take(1).isEmpty,
       s"items in PreparedData cannot be empty." +
-      " Please check if DataSource generates TrainingData" +
-      " and Preprator generates PreparedData correctly.")
+        " Please check if DataSource generates TrainingData" +
+        " and Preprator generates PreparedData correctly.")
     // create User and item's String ID to integer index BiMap
     val userStringIntMap = BiMap.stringInt(data.users.keys)
     val itemStringIntMap = BiMap.stringInt(data.items.keys)
@@ -114,7 +114,7 @@ class RecommAlgorithm(val ap: RecommAlgorithmParams)
     // MLLib ALS cannot handle empty training data.
     require(!mllibRatings.take(1).isEmpty,
       s"mllibRatings cannot be empty." +
-      " Please check if your events contain valid user and item ID.")
+        " Please check if your events contain valid user and item ID.")
 
     // seed for MLlib ALS
     val seed = ap.seed.getOrElse(System.nanoTime)
@@ -138,7 +138,7 @@ class RecommAlgorithm(val ap: RecommAlgorithmParams)
 
     // join item with the trained productFeatures
     val productFeatures: Map[Int, (Item, Option[Array[Double]])] =
-      items.leftOuterJoin(m.productFeatures).collectAsMap.toMap
+    items.leftOuterJoin(m.productFeatures).collectAsMap.toMap
 
     val popularCount = trainDefault(
       userStringIntMap = userStringIntMap,
@@ -178,10 +178,10 @@ class RecommAlgorithm(val ap: RecommAlgorithmParams)
     * 즉 이 과정을 먼저 거친 후 나머지 값과는 합산해준다.
     * */
   def genMLlibRating(
-    userStringIntMap: BiMap[String, Int],
-    itemStringIntMap: BiMap[String, Int],
-    data: PreparedData,
-    sc: SparkContext): RDD[MLlibRating] = {
+                      userStringIntMap: BiMap[String, Int],
+                      itemStringIntMap: BiMap[String, Int],
+                      data: PreparedData,
+                      sc: SparkContext): RDD[MLlibRating] = {
 
     val rateAndownRatings: RDD[((Int, Int), Double)] = Cal_RateOwnRatings(data,userStringIntMap,itemStringIntMap)
 
@@ -347,10 +347,10 @@ class RecommAlgorithm(val ap: RecommAlgorithmParams)
     * 예를 들어 : view 는 1, scrap는 5 ( genMLibRating은 1:1 )
     */
   def trainDefault(
-    userStringIntMap: BiMap[String, Int],
-    itemStringIntMap: BiMap[String, Int],
-    data: PreparedData,
-    sc: SparkContext): Map[Int, Double] = {
+                    userStringIntMap: BiMap[String, Int],
+                    itemStringIntMap: BiMap[String, Int],
+                    data: PreparedData,
+                    sc: SparkContext): Map[Int, Double] = {
 
     val rateAndownCountsRDD: RDD[(Int, Double)] = Cal_RateOwnRatings(data,userStringIntMap,itemStringIntMap).map { case ((u,i),v) => (i, v)}
 
@@ -456,75 +456,61 @@ class RecommAlgorithm(val ap: RecommAlgorithmParams)
       case None => Set()
     }
 
-    val topScores: Array[(Int, Double)] = query.result_type match {
-      case Some(r) =>
-        //필터링 혹은 특정 추천
-        //if (r == "popular"){
-          logger.info(s"popluar recommend.")
-          predictDefault(
-            productModels = productModels,
-            query = query,
-            whiteList = whiteList,
-            blackList = finalBlackList,
-            itemIntStringMap = model.itemIntStringMap,
-            queryList = queryList
-          )
-        //}
-      case None => //원래 추천
-        if (userFeature.isDefined) {
-          // the user has feature vector
-          logger.info(s"predict knownuser found for user ${query.user}.")
-          predictKnownUser(
-            userFeature = userFeature.get,
-            productModels = productModels,
-            query = query,
-            whiteList = whiteList,
-            blackList = finalBlackList,
-            itemIntStringMap = model.itemIntStringMap,
-            queryList = queryList
-          )
-        } else {
-          // the user doesn't have feature vector.
-          // For example, new user is created after model is trained.
-          logger.info(s"No userFeature found for user ${query.user}.")
+    val topScores: Array[(Int, Double)] = if (userFeature.isDefined) {
+      // the user has feature vector
+      logger.info(s"predict knownuser found for user ${query.user}.")
+      predictKnownUser(
+        userFeature = userFeature.get,
+        productModels = productModels,
+        query = query,
+        whiteList = whiteList,
+        blackList = finalBlackList,
+        itemIntStringMap = model.itemIntStringMap,
+        queryList = queryList
+      )
+    } else {
+      // the user doesn't have feature vector.
+      // For example, new user is created after model is trained.
+      logger.info(s"No userFeature found for user ${query.user}.")
 
-          // check if the user has recent events on some items
-          val recentItems: Set[String] = getRecentItems(query)
-          val recentList: Set[Int] = recentItems.flatMap (x =>
-            model.itemStringIntMap.get(x))
+      // check if the user has recent events on some items
+      val recentItems: Set[String] = getRecentItems(query)
+      val recentList: Set[Int] = recentItems.flatMap (x =>
+        model.itemStringIntMap.get(x))
 
-          val recentFeatures: Vector[Array[Double]] = recentList.toVector
-            // productModels may not contain the requested item
-            .map { i =>
-            productModels.get(i).flatMap { pm => pm.features }
-          }.flatten
+      val recentFeatures: Vector[Array[Double]] = recentList.toVector
+        // productModels may not contain the requested item
+        .map { i =>
+        productModels.get(i).flatMap { pm => pm.features }
+      }.flatten
 
-          if (recentFeatures.isEmpty) {
-            logger.info(s"No features vector for recent items ${recentItems}.")
-            predictDefault(
-              productModels = productModels,
-              query = query,
-              whiteList = whiteList,
-              blackList = finalBlackList,
-              itemIntStringMap = model.itemIntStringMap,
-              queryList = queryList
-            )
-          } else {
-            predictSimilar(
-              recentFeatures = recentFeatures,
-              productModels = productModels,
-              query = query,
-              whiteList = whiteList,
-              blackList = finalBlackList,
-              itemIntStringMap = model.itemIntStringMap,
-              queryList = queryList
-            )
-          }
-        }
+      if (recentFeatures.isEmpty) {
+        logger.info(s"No features vector for recent items ${recentItems}.")
+        predictDefault(
+          productModels = productModels,
+          query = query,
+          whiteList = whiteList,
+          blackList = finalBlackList,
+          itemIntStringMap = model.itemIntStringMap,
+          queryList = queryList
+        )
+      } else {
+        predictSimilar(
+          recentFeatures = recentFeatures,
+          productModels = productModels,
+          query = query,
+          whiteList = whiteList,
+          blackList = finalBlackList,
+          itemIntStringMap = model.itemIntStringMap,
+          queryList = queryList
+        )
+      }
     }
 
 
     val itemScores = topScores.map { case (i, s) =>
+      //logger.info(s"result : ${model.itemIntStringMap(i)}")
+
       new ItemScore(
         // convert item int index back to string ID
         item = model.itemIntStringMap(i),
@@ -616,9 +602,7 @@ class RecommAlgorithm(val ap: RecommAlgorithmParams)
       item_type = "cosmetic"
       similarEvent = Seq("view","own","rate","scrap")
     }
-
     print(s"$similarEvent")
-
     // get latest 10 user view item events
     val recentEvents = try {
       LEventStore.findByEntity(
@@ -642,7 +626,6 @@ class RecommAlgorithm(val ap: RecommAlgorithmParams)
         logger.error(s"Error when read recent events: ${e}")
         throw e
     }
-
     val recentItems: Set[String] = recentEvents.map { event =>
       try {
         event.targetEntityId.get
@@ -653,7 +636,6 @@ class RecommAlgorithm(val ap: RecommAlgorithmParams)
         }
       }
     }.toSet
-
     recentItems
      */
     // get latest 10 user view item events
@@ -696,17 +678,17 @@ class RecommAlgorithm(val ap: RecommAlgorithmParams)
 
   /** Prediction for user with known feature vector */
   def predictKnownUser(
-    userFeature: Array[Double],
-    productModels: Map[Int, ProductModel],
-    query: Query,
-    whiteList: Option[Set[Int]],
-    blackList: Set[Int],
-    itemIntStringMap: BiMap[Int, String],
-    queryList: Set[String]
-  ): Array[(Int, Double)] = {
+                        userFeature: Array[Double],
+                        productModels: Map[Int, ProductModel],
+                        query: Query,
+                        whiteList: Option[Set[Int]],
+                        blackList: Set[Int],
+                        itemIntStringMap: BiMap[Int, String],
+                        queryList: Set[String]
+                      ): Array[(Int, Double)] = {
     val indexScores: Map[Int, Double] = productModels.par // convert to parallel collection
       .filter { case (i, pm) =>
-        pm.features.isDefined &&
+      pm.features.isDefined &&
         isCandidateItem(
           i = i,
           item = pm.item,
@@ -719,7 +701,7 @@ class RecommAlgorithm(val ap: RecommAlgorithmParams)
           itemIntStringMap = itemIntStringMap,
           queryList = queryList
         )
-      }
+    }
       .map { case (i, pm) =>
         // NOTE: features must be defined, so can call .get
         val s = dotProduct(userFeature, pm.features.get)
@@ -737,28 +719,28 @@ class RecommAlgorithm(val ap: RecommAlgorithmParams)
 
   /** Default prediction when know nothing about the user */
   def predictDefault(
-    productModels: Map[Int, ProductModel],
-    query: Query,
-    whiteList: Option[Set[Int]],
-    blackList: Set[Int],
-    itemIntStringMap: BiMap[Int, String],
-    queryList: Set[String]
-  ): Array[(Int, Double)] = {
+                      productModels: Map[Int, ProductModel],
+                      query: Query,
+                      whiteList: Option[Set[Int]],
+                      blackList: Set[Int],
+                      itemIntStringMap: BiMap[Int, String],
+                      queryList: Set[String]
+                    ): Array[(Int, Double)] = {
     val indexScores: Map[Int, Double] = productModels.par // convert back to sequential collection
       .filter { case (i, pm) =>
-        isCandidateItem(
-          i = i,
-          item = pm.item,
-          item_type = query.item_type,
-          cosmetic = query.cosmetic,
-          brand = query.brand,
-          categories = query.categories,
-          whiteList = whiteList,
-          blackList = blackList,
-          itemIntStringMap = itemIntStringMap,
-          queryList = queryList
-        )
-      }
+      isCandidateItem(
+        i = i,
+        item = pm.item,
+        item_type = query.item_type,
+        cosmetic = query.cosmetic,
+        brand = query.brand,
+        categories = query.categories,
+        whiteList = whiteList,
+        blackList = blackList,
+        itemIntStringMap = itemIntStringMap,
+        queryList = queryList
+      )
+    }
       .map { case (i, pm) =>
         // may customize here to further adjust score
         (i, pm.count.toDouble)
@@ -773,17 +755,17 @@ class RecommAlgorithm(val ap: RecommAlgorithmParams)
 
   /** Return top similar items based on items user recently has action on */
   def predictSimilar(
-    recentFeatures: Vector[Array[Double]],
-    productModels: Map[Int, ProductModel],
-    query: Query,
-    whiteList: Option[Set[Int]],
-    blackList: Set[Int],
-    itemIntStringMap: BiMap[Int, String],
-    queryList: Set[String]
-  ): Array[(Int, Double)] = {
+                      recentFeatures: Vector[Array[Double]],
+                      productModels: Map[Int, ProductModel],
+                      query: Query,
+                      whiteList: Option[Set[Int]],
+                      blackList: Set[Int],
+                      itemIntStringMap: BiMap[Int, String],
+                      queryList: Set[String]
+                    ): Array[(Int, Double)] = {
     val indexScores: Map[Int, Double] = productModels.par // convert to parallel collection
       .filter { case (i, pm) =>
-        pm.features.isDefined &&
+      pm.features.isDefined &&
         isCandidateItem(
           i = i,
           item = pm.item,
@@ -796,7 +778,7 @@ class RecommAlgorithm(val ap: RecommAlgorithmParams)
           itemIntStringMap = itemIntStringMap,
           queryList = queryList
         )
-      }
+    }
       .map { case (i, pm) =>
         val s = recentFeatures.map{ rf =>
           // pm.features must be defined because of filter logic above
@@ -865,54 +847,64 @@ class RecommAlgorithm(val ap: RecommAlgorithmParams)
 
   private
   def isCandidateItem(
-    i: Int,
-    item: Item,
-    item_type: String,
-    cosmetic: Option[String],
-    brand: Option[String],
-    categories: Option[Set[String]],
-    whiteList: Option[Set[Int]],
-    blackList: Set[Int],
-    itemIntStringMap: BiMap[Int, String],
-    queryList: Set[String]
-  ): Boolean = {
+                       i: Int,
+                       item: Item,
+                       item_type: String,
+                       cosmetic: Option[String],
+                       brand: Option[String],
+                       categories: Option[Set[String]],
+                       whiteList: Option[Set[Int]],
+                       blackList: Set[Int],
+                       itemIntStringMap: BiMap[Int, String],
+                       queryList: Set[String]
+                     ): Boolean = {
     var query_flag = true
-    if(item.item_type == "cosmetic") {
+    if(item.item_type == "cosmetic" && item.item_type == item_type) {
       if(queryList.contains("")) query_flag = false
       else {
         queryList.map { s =>
           if (!itemIntStringMap(i).replaceAll(" ", "").contains(s)) {
             query_flag = false
-            logger.info(s"cosmetic ${itemIntStringMap(i).replaceAll(" ", "")} not contain ${s}")
-          }
+          }else logger.info(s"cosmetic ${itemIntStringMap(i).replaceAll(" ", "")} contain ${s}")
         }
       }
-    }else if(item.item_type == "content"){
+    }else if(item.item_type == "content" && item.item_type == item_type){
       //아래 1,2는 겹칠 일이 없음
       //1.화장품 상세 - 영상 추천인 경우 ( 쿼리의 화장품이 포함된 결과만 리턴 )
       if(cosmetic != None){
-        query_flag = item.cosmetics.get.contains(cosmetic.get)
-        print(s"${itemIntStringMap(i)} result : ${query_flag}")
+        if(item.cosmetics.get.contains(cosmetic.get)){
+          query_flag = true
+          logger.info(s"${itemIntStringMap(i)} 's cosmetics : ${item.cosmetics.get}")
+        }else query_flag = false
       }else {
         //2.검색한 경우 검색어 필터링
-        val contain_query = item.cosmetics.get
-          .map { c =>
-            var flag = true
-            queryList.map { s =>
-              if (!c.replaceAll(" ", "").contains(s)) {
-                flag = false
-                logger.info(s"content's cosmetic ${c.replaceAll(" ", "")} not contain ${s}")
+        if(item.cosmetics.get.size > 0) { //화장품 배열에 뭐 든 경우만.
+          val contain_query = item.cosmetics.get
+            .map { c =>
+              var flag = true
+              queryList.map { s =>
+                try {
+                  if (!c.replaceAll(" ", "").contains(s)) {
+                    flag = false
+                  } else logger.info(s"content's cosmetic ${c.replaceAll(" ", "")} contain ${s}")
+                } catch {
+                  case e: Exception =>
+                    println("Error: " + e.getMessage)
+                    flag = false
+                }
               }
-            }
-            flag
-          }.toSet
-        if (contain_query.contains(true)) {
-          query_flag = true
-        } else {
-          query_flag = false
-        }
+              flag
+            }.toSet
+          if (contain_query.contains(true)) {
+            query_flag = true
+          } else {
+            query_flag = false
+          }
+        }else query_flag = false
       }
     }
+
+    //if(query_flag) logger.info(s"${itemIntStringMap(i)} 통과했어염")
 
     var brand_flag : Boolean = {
       if(brand == None) true
@@ -920,14 +912,14 @@ class RecommAlgorithm(val ap: RecommAlgorithmParams)
     }
 
     query_flag && brand_flag &&
-    whiteList.map(_.contains(i)).getOrElse(true) &&
-    !blackList.contains(i) &&
-    // filter categories
-    categories.map { cat =>
-      item.categories.map { itemCat =>
-        // keep this item if has ovelap categories with the query
-        !(itemCat.toSet.intersect(cat).isEmpty)
-      }.getOrElse(false) // discard this item if it has no categories
-    }.getOrElse(true) && (item_type == item.item_type)
+      whiteList.map(_.contains(i)).getOrElse(true) &&
+      !blackList.contains(i) &&
+      // filter categories
+      categories.map { cat =>
+        item.categories.map { itemCat =>
+          // keep this item if has ovelap categories with the query
+          !(itemCat.toSet.intersect(cat).isEmpty)
+        }.getOrElse(false) // discard this item if it has no categories
+      }.getOrElse(true) && (item_type == item.item_type)
   }
 }

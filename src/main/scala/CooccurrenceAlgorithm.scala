@@ -168,17 +168,23 @@ class CooccurrenceAlgorithm(val ap: CooccurrenceAlgorithmParams)
     val counts: Array[(Int, Double)] = {
       if (query.item_type == "content"){
         query.search match {
-          case Some(s) =>
+          case Some(s) => //영상 검색일때 소유 + 전체
             val sum_array = itemZeroScore.map{
               case (i,score) => (i, score+content_counts.getOrElse(i,0.0))
             }
             sum_array.toArray
-          case None =>
+          case None => // 영상
             query.result_type match {
               case Some(r) =>
                 //popluar일때
                 itemZeroScore.toArray
-              case None => content_counts.toArray
+              case None =>
+                if(query.cosmetic != None){ // 화장품 관련
+                  val sum_array = itemZeroScore.map{
+                    case (i,score) => (i, score+content_counts.getOrElse(i,0.0))
+                  }
+                  sum_array.toArray
+                }else content_counts.toArray
             }
         }
       }
@@ -198,6 +204,7 @@ class CooccurrenceAlgorithm(val ap: CooccurrenceAlgorithmParams)
         isCandidateItem(
           i = i,
           items = model.items,
+          item_type = query.item_type,
           categories = query.categories,
           cosmetic = query.cosmetic,
           whiteList = whiteList,
@@ -210,6 +217,8 @@ class CooccurrenceAlgorithm(val ap: CooccurrenceAlgorithmParams)
       .sortBy(_._2)(Ordering.Double.reverse)
       .take(query.num)
       .map { case (index, count) =>
+        //logger.info(s"result : ${model.itemIntStringMap(index)}")
+
         ItemScore(
           item = model.itemIntStringMap(index),
           score = count
@@ -223,6 +232,7 @@ class CooccurrenceAlgorithm(val ap: CooccurrenceAlgorithmParams)
   def isCandidateItem(
                        i: Int,
                        items: Map[Int, Item],
+                       item_type: String,
                        categories: Option[Set[String]],
                        cosmetic: Option[String],
                        whiteList: Option[Set[Int]],
@@ -233,39 +243,42 @@ class CooccurrenceAlgorithm(val ap: CooccurrenceAlgorithmParams)
                      ): Boolean = {
 
     var query_flag = true
-    if(items(i).item_type == "cosmetic") {
+    if(items(i).item_type == "cosmetic" && items(i).item_type == item_type){
       queryList match {
-        case Some(set) =>
-          //popluar일때
-          if(set.contains("")) query_flag = false
+        case Some(set) => // 화장품 검색일때
+          if(set.contains("")) query_flag = false  //검색어 쿼리를 언급했으나 ""인 경우
           else {
             set.map { s =>
               if (!itemIntStringMap(i).replaceAll(" ", "").contains(s)) {
                 query_flag = false
-                logger.info(s"cosmetic ${itemIntStringMap(i).replaceAll(" ", "")} not contain ${s}")
-              }
+              }else logger.info(s"cosmetic ${itemIntStringMap(i).replaceAll(" ", "")} contain ${s}")
             }
           }
-        case None => query_flag = true
+        case None => query_flag = true // 화장품 추천, 랭킹(popular)일때
       }
-    }else if(items(i).item_type == "content"){
+    }else if(items(i).item_type == "content" && items(i).item_type == item_type){
       queryList match {
-        case Some(set) =>
-
-          //아래 1,2는 겹칠 일이 없음
-          //1.화장품 상세 - 영상 추천인 경우 ( 쿼리의 화장품이 포함된 결과만 리턴 )
+        case Some(set) => // 영상 검색인 경우
           if(cosmetic != None){
-            query_flag = items(i).cosmetics.get.contains(cosmetic.get)
-            print(s"${itemIntStringMap(i)} result : ${query_flag}")
+            //영상검색 && 화장품 연관일때
+            if(items(i).cosmetics.get.contains(cosmetic.get)) {
+              query_flag = true
+              logger.info(s"${itemIntStringMap(i)} 's cosmetics : ${items(i).cosmetics.get}")
+            }else query_flag = false
           }else {
-            //2.검색한 경우 검색어 필터링
+            //영상 검색일때
             val contain_query = items(i).cosmetics.get
               .map { c =>
                 var flag = true
                 set.map { s =>
-                  if (!c.replaceAll(" ", "").contains(s)) {
-                    flag = false
-                    logger.info(s"content's cosmetic ${c.replaceAll(" ", "")} not contain ${s}")
+                  try {
+                    if (!c.replaceAll(" ", "").contains(s)) {
+                      flag = false
+                    } else logger.info(s"content's cosmetic ${c.replaceAll(" ", "")} contain ${s}")
+                  } catch {
+                    case e: Exception =>
+                      println("Error: " + e.getMessage)
+                      flag = false
                   }
                 }
                 flag
@@ -274,18 +287,23 @@ class CooccurrenceAlgorithm(val ap: CooccurrenceAlgorithmParams)
               query_flag = true
             } else {
               query_flag = false
+              logger.info(s"${itemIntStringMap(i)} 화장품 포함하고 안함")
             }
           }
-        case None =>
-          if(cosmetic != None){
-            query_flag = items(i).cosmetics.get.contains(cosmetic.get)
-            print(s"${itemIntStringMap(i)} result : ${query_flag}")
+        case None => // 추천일때
+          if(cosmetic != None){ // 추천 && 화장품 연관
+            if(items(i).cosmetics.get.contains(cosmetic.get)) {
+              query_flag = true
+              logger.info(s"${itemIntStringMap(i)} 's cosmetic result : ${query_flag}")
+            }else query_flag = false
           }else {
-            //2.검색한 경우 검색어 필터링
+            //그냥 추천
             query_flag = true
           }
       }
     }
+
+    //if(query_flag) logger.info(s"${itemIntStringMap(i)} 통과했어염")
 
 
     var brand_flag : Boolean = {
@@ -303,7 +321,7 @@ class CooccurrenceAlgorithm(val ap: CooccurrenceAlgorithmParams)
           // keep this item if has ovelap categories with the query
           !(itemCat.toSet.intersect(cat).isEmpty)
         }.getOrElse(false) // discard this item if it has no categories
-      }.getOrElse(true)
+      }.getOrElse(true) && (item_type == items(i).item_type)
   }
 
 }
