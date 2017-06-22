@@ -455,37 +455,9 @@ class RecommAlgorithm(val ap: RecommAlgorithmParams)
       case Some(s) => s.split(" ").toSet
       case None => Set()
     }
-
-    val topScores: Array[(Int, Double)] = if (userFeature.isDefined) {
-      // the user has feature vector
-      logger.info(s"predict knownuser found for user ${query.user}.")
-      predictKnownUser(
-        userFeature = userFeature.get,
-        productModels = productModels,
-        query = query,
-        whiteList = whiteList,
-        blackList = finalBlackList,
-        itemIntStringMap = model.itemIntStringMap,
-        queryList = queryList
-      )
-    } else {
-      // the user doesn't have feature vector.
-      // For example, new user is created after model is trained.
-      logger.info(s"No userFeature found for user ${query.user}.")
-
-      // check if the user has recent events on some items
-      val recentItems: Set[String] = getRecentItems(query)
-      val recentList: Set[Int] = recentItems.flatMap (x =>
-        model.itemStringIntMap.get(x))
-
-      val recentFeatures: Vector[Array[Double]] = recentList.toVector
-        // productModels may not contain the requested item
-        .map { i =>
-        productModels.get(i).flatMap { pm => pm.features }
-      }.flatten
-
-      if (recentFeatures.isEmpty) {
-        logger.info(s"No features vector for recent items ${recentItems}.")
+    val topScores: Array[(Int, Double)] = query.result_type match {
+      case Some(r) =>
+        logger.info(s"predict popluar.")
         predictDefault(
           productModels = productModels,
           query = query,
@@ -494,17 +466,57 @@ class RecommAlgorithm(val ap: RecommAlgorithmParams)
           itemIntStringMap = model.itemIntStringMap,
           queryList = queryList
         )
-      } else {
-        predictSimilar(
-          recentFeatures = recentFeatures,
-          productModels = productModels,
-          query = query,
-          whiteList = whiteList,
-          blackList = finalBlackList,
-          itemIntStringMap = model.itemIntStringMap,
-          queryList = queryList
-        )
-      }
+      case None =>
+        if (userFeature.isDefined) {
+          // the user has feature vector
+          logger.info(s"predict knownuser found for user ${query.user}.")
+          predictKnownUser(
+            userFeature = userFeature.get,
+            productModels = productModels,
+            query = query,
+            whiteList = whiteList,
+            blackList = finalBlackList,
+            itemIntStringMap = model.itemIntStringMap,
+            queryList = queryList
+          )
+        } else {
+          // the user doesn't have feature vector.
+          // For example, new user is created after model is trained.
+          logger.info(s"No userFeature found for user ${query.user}.")
+
+          // check if the user has recent events on some items
+          val recentItems: Set[String] = getRecentItems(query)
+          val recentList: Set[Int] = recentItems.flatMap(x =>
+            model.itemStringIntMap.get(x))
+
+          val recentFeatures: Vector[Array[Double]] = recentList.toVector
+            // productModels may not contain the requested item
+            .map { i =>
+            productModels.get(i).flatMap { pm => pm.features }
+          }.flatten
+
+          if (recentFeatures.isEmpty) {
+            logger.info(s"No features vector for recent items ${recentItems}.")
+            predictDefault(
+              productModels = productModels,
+              query = query,
+              whiteList = whiteList,
+              blackList = finalBlackList,
+              itemIntStringMap = model.itemIntStringMap,
+              queryList = queryList
+            )
+          } else {
+            predictSimilar(
+              recentFeatures = recentFeatures,
+              productModels = productModels,
+              query = query,
+              whiteList = whiteList,
+              blackList = finalBlackList,
+              itemIntStringMap = model.itemIntStringMap,
+              queryList = queryList
+            )
+          }
+        }
     }
 
 
@@ -879,22 +891,22 @@ class RecommAlgorithm(val ap: RecommAlgorithmParams)
       }else {
         //2.검색한 경우 검색어 필터링
         if(item.cosmetics.get.size > 0) { //화장품 배열에 뭐 든 경우만.
-          val contain_query = item.cosmetics.get
-            .map { c =>
-              var flag = true
-              queryList.map { s =>
-                try {
-                  if (!c.replaceAll(" ", "").contains(s)) {
-                    flag = false
-                  } else logger.info(s"content's cosmetic ${c.replaceAll(" ", "")} contain ${s}")
-                } catch {
-                  case e: Exception =>
-                    println("Error: " + e.getMessage)
-                    flag = false
-                }
+        val contain_query = item.cosmetics.get
+          .map { c =>
+            var flag = true
+            queryList.map { s =>
+              try {
+                if (!c.replaceAll(" ", "").contains(s)) {
+                  flag = false
+                } else logger.info(s"content's cosmetic ${c.replaceAll(" ", "")} contain ${s}")
+              } catch {
+                case e: Exception =>
+                  println("Error: " + e.getMessage)
+                  flag = false
               }
-              flag
-            }.toSet
+            }
+            flag
+          }.toSet
           if (contain_query.contains(true)) {
             query_flag = true
           } else {
